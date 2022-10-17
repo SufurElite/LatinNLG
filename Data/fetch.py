@@ -1,12 +1,15 @@
+"""
+    A file to retrieve author specific data retrieval
+"""
+
 import os
 os.environ["CLTK_DATA"] = os.getcwd()+"/texts/"
 
 from cltk import NLP
 from cltk.data.fetch import FetchCorpus
-from texts.lat.text.lat_text_perseus.xml_to_json import cleanup_file_perseus_xml
 
 
-def textRetrieval():
+def text_retrieval() -> None:
     corpaDownloader = FetchCorpus(language="lat")
     print("Retrieving Perseus Texts")
     corpaDownloader.import_corpus("lat_text_perseus")
@@ -18,5 +21,6 @@ def textRetrieval():
     corpaDownloader.import_corpus("lat_text_tesserae")
     print("Retrieving the Grammaticorum Latinorum Texts")
     corpaDownloader.import_corpus("latin_text_corpus_grammaticorum_latinorum")
+
 if __name__=="__main__":
-    print(cleanup_file_perseus_xml(os.getcwd()+"/texts/lat/text/lat_text_perseus/Horace/opensource/hor.ap_lat.xml"))
+    text_retrieval()
