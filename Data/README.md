@@ -6,7 +6,7 @@ https://github.com/cltk/lat_text_perseus
 
 ## The Latin Library
 https://github.com/cltk/lat_text_latin_library
-~127.7 MB
+~108 MB
 
 ## Italian Poets in Latin
 https://www.poetiditalia.it/public/
