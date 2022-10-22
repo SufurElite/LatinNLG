@@ -21,6 +21,8 @@ def text_retrieval() -> None:
     corpaDownloader.import_corpus("lat_text_tesserae")
     print("Retrieving the Grammaticorum Latinorum Texts")
     corpaDownloader.import_corpus("latin_text_corpus_grammaticorum_latinorum")
+    print("Installing Language Models")
+    corpaDownloader.import_corpus("lat_models_cltk")
 
 if __name__=="__main__":
     text_retrieval()
