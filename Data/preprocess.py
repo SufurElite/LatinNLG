@@ -1,8 +1,9 @@
-import os
+import os, warnings
 os.environ["CLTK_DATA"] = os.getcwd()+"/texts/"
-
-from cltk.tokenizers.lat.lat import LatinWordTokenizer as WordTokenizer
-from cltk.tokenizers.lat.lat import LatinPunktSentenceTokenizer as SentenceTokenizer
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore",category=UserWarning)
+    from cltk.tokenizers.lat.lat import LatinWordTokenizer as WordTokenizer
+    from cltk.tokenizers.lat.lat import LatinPunktSentenceTokenizer as SentenceTokenizer
 import re
 
 class PreProcessor():

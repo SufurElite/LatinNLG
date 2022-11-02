@@ -1,18 +1,21 @@
 """
     A data exploration file
 """
-import os, json
+import os, json, re, pickle
 from texts.lat.text.lat_text_perseus.xml_to_json import cleanup_file_perseus_xml, extract_xml_str, parse_chapter, parse_poems
 from preprocess import PreProcessor
+from fetch import text_retrieval
 # Directories for the data after fetch.py is run
-PERSEUS_DATA_DIR = os.getcwd()+"/texts/lat/text/lat_text_perseus/"
-LATIN_LIBRARY_DIR = os.getcwd()+"/texts/lat/text/lat_text_latin_library/"
-ITALIAN_POETS_DIR = os.getcwd()+"/texts/lat/text/latin_text_poeti_ditalia/"
-LATIN_TESSERAE_DIR = os.getcwd()+"/texts/lat/text/lat_text_tesserae/texts/"
-LATIN_GRAMMATICORUM_DIR = os.getcwd()+"/texts/lat/latin_text_corpus_grammaticorum_latinorum/"
+LATIN_BASE_DIR = os.getcwd()+"/texts/lat/text/"
+PERSEUS_DATA_DIR = LATIN_BASE_DIR+"lat_text_perseus/"
+LATIN_LIBRARY_DIR = LATIN_BASE_DIR+"lat_text_latin_library/"
+ITALIAN_POETS_DIR = LATIN_BASE_DIR+"latin_text_poeti_ditalia/cltk_json/"
+LATIN_TESSERAE_DIR = LATIN_BASE_DIR+"lat_text_tesserae/texts/"
+LATIN_GRAMMATICORUM_DIR = LATIN_BASE_DIR+"latin_text_corpus_grammaticorum_latinorum/"
 
+OUR_CORPUS_LOC = os.getcwd()+"/corpus.pickle"
 
-class DataEngModel:
+class CorpusInterface:
     def __init__(self):
         # constants
         self.FILE_TYPE_PARSERS = [parse_chapter, parse_poems]
@@ -27,13 +30,7 @@ class DataEngModel:
         if author not in self.authorToWorks:
             self.authorToWorks[author] = []
         ppText = self.PrePro.preprocess(text, keepPunct = False)
-        for og_texts in self.authorToWorks[author]:
-            # og_texts[0] = the version without punctuation
-            if self.similarity_identification(og_texts[0], ppText):
-                print("Found identical texts for {}, \n\t{}".format(author,text))
-                return False
-        punctText = self.PrePro.preprocess(text, keepPunct = True)
-        self.authorToWorks[author].append([ppText,punctText])
+        self.authorToWorks[author].append([ppText,None])
         return True
 
     def similarity_identification(self, textOne, textTwo, simPercent = .7):
@@ -103,14 +100,73 @@ class DataEngModel:
     def load_latin_library(self):
         for root, dirs, files in os.walk(LATIN_LIBRARY_DIR):
             print(root)
-            for name in files:
-                if name.split(".")[-1]!="txt": continue
-                print("\t"+name)
-            input() 
-        pass
+            author = root.split("/")[-1].strip()
+            if author == "git": continue
 
-    def load_italian_poets(self):
+            print("author : {}".format(author))
+            for name in files:
+                fileName = name.split(".")
+                if fileName[-1]!="txt": continue
+                if root==LATIN_LIBRARY_DIR:
+                    numIdx = re.search(r"\d", fileName[0])
+                    if numIdx:
+                        author = fileName[0][:numIdx.start()].strip()
+                    else:
+                        author = fileName[0].strip()
+                    print("author : {}".format(author))
+                print("\t\t"+name)
+                # RIGHT NOW JUST A SKIP TO NOT WORRY ABOUT DUPLICATES UNTIL I USE THE OTHER METHODOLOGY
+                if author in self.authorToWorks: continue
+                if author =="": continue
+                
+                text = []
+                with open(root+"/"+name) as f:
+                    if not self.includeLineBreaks:
+                        data = f.read().split("\n")
+                        del data[len(data)-1]
+                    else:
+                        data = f.readlines()
+                
+                lastEmpty = 0
+                for lineNum in range(len(data)):
+                    line = data[lineNum].strip()
+                    if not line:
+                        lastEmpty = lineNum
+                        continue
+                        
+                    text.append(line)
+                    if lineNum==len(data)-1:
+                        # find how many lines to delete from the text
+                        diffInLength = len(data)-lastEmpty-1
+                        del text[-diffInLength:]
+                        # will add algorithmically more words to search for if there are any English sentences at the 
+                        # end of the text
+                        if text!=[] and text[len(text)-1].lower().find("prepared")>-1:
+                            del text[len(text)-1]
+                if text==[]: continue
+                text = ' '.join(text)
+                self.add_text(author, text)
         pass
+    
+    def load_italian_poets(self):
+        for root, dirs, files in os.walk(ITALIAN_POETS_DIR):
+            for name in files:
+                if name.split(".")[-1]!="json": continue
+                print(root+"/"+name)
+                with open(root+"/"+name) as f:
+                    data = json.load(f)
+                
+                author = data['author'].lower().replace(" ",'')
+                # RIGHT NOW JUST A SKIP TO NOT WORRY ABOUT DUPLICATES UNTIL I USE THE OTHER METHODOLOGY
+                if author in self.authorToWorks: continue
+                
+                text = []
+                for i in data['text'].keys():
+                    text.append(data['text'][i])
+                text = " ".join(text)
+                
+                self.add_text(author, text)  
+
 
     def load_tesserae_corpus(self):
         for root, dirs, files in os.walk(LATIN_TESSERAE_DIR):
@@ -120,7 +176,7 @@ class DataEngModel:
                 nameParts = name.split(".")
                 if nameParts[-1]!="tess": continue
                 print(name)
-                author = nameParts[0].lower().replace("_"," ")
+                author = nameParts[0].lower().replace("_","")
                 text = ""
 
                 with open(root+"/"+name) as f:
@@ -138,25 +194,94 @@ class DataEngModel:
                 self.add_text(author, text)  
     
     def load_corpus_grammaticorum(self):
-        pass 
+        for root, dirs, files in os.walk(LATIN_GRAMMATICORUM_DIR):
+            for name in files:
+                if name.split(".")[-1]!="json": continue
+                print(root+"/"+name)
+                with open(root+"/"+name) as f:
+                    data = json.load(f)
+                text = data['text']
+                print(text)
+                print(type(text))
+                input()
+                author = data['author'].lower().replace(" ",'')
+                self.add_text(author, text)  
+
+    def load_new_data(self):
+        self.load_tesserae_corpus()
+        self.load_italian_poets()
+        self.load_latin_library()
+        
+        #self.load_perseus()
+        #self.load_corpus_grammaticorum()
+
+        # Once we've loaded in all the data available, determine if there are any identical texts for the authors
+        # this is quite a slow methodology
+        """
+        authors = sorted(self.authorToWorks.keys())
+        for author in authors:
+            print("Currently on {}".format(author))
+            if len(self.authorToWorks[author])==1: continue
+            removeList = []
+            for i in range(len(self.authorToWorks[author])):
+                if i in removeList: continue
+                for j in range(i, len(self.authorToWorks[author])):
+                    if j in removeList: continue
+                    if self.similarity_identification(self.authorToWorks[author][i][0], self.authorToWorks[author][j][0]):
+                        print("Found identical texts for {}".format(author))
+                        if len(self.authorToWorks[author][i][0])<len(self.authorToWorks[author][j][0]):
+                            removeList.append(i)
+                        else:
+                            removeList.append(j)
+                if i not in removeList:
+                    punctText = self.PrePro.preprocess(text, keepPunct = True)
+                    self.authorToWorks[author][i][1] = punctText
+            for i in removeList:
+                del self.authorToWorks[i]
+        """             
+
+    def save_corpus(self):
+        with open(OUR_CORPUS_LOC, "wb") as f:
+            pickle.dump(self.authorToWorks, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def load_existing_corpus(self):
+        with open(OUR_CORPUS_LOC, 'rb') as f:
+            self.authorToWorks = pickle.load(f)
 
     def load_data(self):
-        self.load_tesserae_corpus()
-        #self.load_perseus()
-        #self.load_latin_library()
-        #self.load_italian_poets()
-        #self.load_corpus_grammaticorum()
+        # first check if we have loaded the data using the fetch function
+        if not os.path.exists(LATIN_BASE_DIR):
+            print("Did not find the downlaoded corpus. Did you run fetch.py? Now calling text_retrieval from fetch.py")
+            text_retrieval()
+        # check if we have already created the dataset previously
+        if os.path.exists(OUR_CORPUS_LOC):
+            self.load_existing_corpus()
+        else: 
+            self.load_new_data()
+            # save new data
+            self.save_corpus()
 
         # now print information about the corpus
         self.corpus_overview()
         
-    def corpus_overview(self):
+    def corpus_overview(self, saveText: bool = False):
         """ Just a helper function to show some information about the corpus """
-        for author in self.authorToWorks.keys():
+        authorStats = ""
+        authors = ""
+        sorted_auths = sorted(self.authorToWorks.keys())
+        for author in sorted_auths:
+            authors+=author+"\n"
             lengthOfTexts = 0
             for text in self.authorToWorks[author]:
-                lengthOfTexts+=len(text)
-            print("Author {} had {} pieces of work with a total of {} characters of text".format(author, len(self.authorToWorks[author]),lengthOfTexts))
+                lengthOfTexts+=len(text[0])
+            cur_auth_stat = "{} had {} pieces of work with a total of {} characters of text".format(author, len(self.authorToWorks[author]),lengthOfTexts)
+            print(cur_auth_stat)
+            authorStats+=cur_auth_stat+"\n"
+        if saveText:
+            with open("author_stats.txt", "w+") as f:
+                f.write(authorStats)
+            with open("authors.txt", "w+") as f:
+                f.write(authors)
 
 
     def data_by_time_period(self):
@@ -165,11 +290,4 @@ class DataEngModel:
 
 
 if __name__=="__main__":
-    dm = DataEngModel()
-    """
-    text1 = "multa quoque et bello passus, dum conderet urbem, inferretque deos Latio, genus unde Latinum, Albanique patres, atque altae moenia Romae. Musa, mihi causas memora, quo numine laeso, quidve dolens, regina deum tot volvere casus"
-    text2 = "litora, multum ille et terris iactatus et alto vi superum saevae memorem Iunonis ob iram; multa quoque et bello passus, dum conderet urbem, inferretque deos Latio, genus unde Latinum, Albanique patres, atque altae moenia Romae. Musa, mihi causas memora, quo numine laeso, quidve dolens, regina deum tot volvere casus"
-    text1 = dm.PrePro.preprocess(text1)
-    text2 = dm.PrePro.preprocess(text2)
-    print(dm.similarity_identification(text1,text2))
-    """
+    ci = CorpusInterface()
