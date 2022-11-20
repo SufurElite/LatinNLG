@@ -16,8 +16,8 @@ class PreProcessor():
 
     def preprocess(self, inputText: str, keepPunct: bool = True) -> [str]:
         text = []
-        inputText = inputText.lower()
-        text = self.wt.tokenize("atque haec abuterque puerve paterne nihil", enclitics=["que"])
+        # include only unicode characters
+        inputText = re.sub(r'[^\x00-\x7F]+',' ', inputText).lower()
         sents = self.st.tokenize(inputText)
 
         for sent in sents:
@@ -31,5 +31,5 @@ class PreProcessor():
 
 if __name__=="__main__":
     pp = PreProcessor()
-    text = 'atque haec abuterque puerve paterne nihil mecum'
-    print(pp.preprocess(text))
+    text = 'atque haec Παρὰ τοῦ πάππου Οὐήρου τὸ καλόηθες καὶ ἀόργητον. abuterque puerve paterne nihil mecum'
+    print(pp.preprocess(text, False))
