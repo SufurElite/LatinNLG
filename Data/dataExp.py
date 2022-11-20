@@ -30,7 +30,7 @@ class CorpusInterface:
         if author not in self.authorToWorks:
             self.authorToWorks[author] = []
         ppText = self.PrePro.preprocess(text, keepPunct = False)
-        self.authorToWorks[author].append([ppText,None])
+        self.authorToWorks[author].append([ppText,text])
         return True
 
     def similarity_identification(self, textOne, textTwo, simPercent = .7):
@@ -217,7 +217,7 @@ class CorpusInterface:
 
         # Once we've loaded in all the data available, determine if there are any identical texts for the authors
         # this is quite a slow methodology
-        """
+        
         authors = sorted(self.authorToWorks.keys())
         for author in authors:
             print("Currently on {}".format(author))
@@ -225,7 +225,8 @@ class CorpusInterface:
             removeList = []
             for i in range(len(self.authorToWorks[author])):
                 if i in removeList: continue
-                for j in range(i, len(self.authorToWorks[author])):
+                for j in range(i+1, len(self.authorToWorks[author])):
+                    print("{} | {}:{}".format(author,str(i),str(j)))
                     if j in removeList: continue
                     if self.similarity_identification(self.authorToWorks[author][i][0], self.authorToWorks[author][j][0]):
                         print("Found identical texts for {}".format(author))
@@ -234,11 +235,10 @@ class CorpusInterface:
                         else:
                             removeList.append(j)
                 if i not in removeList:
-                    punctText = self.PrePro.preprocess(text, keepPunct = True)
+                    punctText = self.PrePro.preprocess(self.authorToWorks[author][i][1], keepPunct = True)
                     self.authorToWorks[author][i][1] = punctText
             for i in removeList:
-                del self.authorToWorks[i]
-        """             
+                del self.authorToWorks[author][i]   
 
     def save_corpus(self):
         with open(OUR_CORPUS_LOC, "wb") as f:

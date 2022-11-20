@@ -5,6 +5,7 @@ with warnings.catch_warnings():
     from cltk.tokenizers.lat.lat import LatinWordTokenizer as WordTokenizer
     from cltk.tokenizers.lat.lat import LatinPunktSentenceTokenizer as SentenceTokenizer
 import re
+from unidecode import unidecode
 
 class PreProcessor():
     """ A PreProcessing class so as to not instantiate multiple versions of the tokenizer in short
@@ -16,8 +17,8 @@ class PreProcessor():
 
     def preprocess(self, inputText: str, keepPunct: bool = True) -> [str]:
         text = []
-        inputText = inputText.lower()
-        text = self.wt.tokenize("atque haec abuterque puerve paterne nihil", enclitics=["que"])
+        # include only unicode characters
+        inputText = unidecode(inputText)
         sents = self.st.tokenize(inputText)
 
         for sent in sents:
@@ -31,5 +32,5 @@ class PreProcessor():
 
 if __name__=="__main__":
     pp = PreProcessor()
-    text = 'atque haec abuterque puerve paterne nihil mecum'
-    print(pp.preprocess(text))
+    text = 'atque haec Παρὰ τοῦ πάππου Οὐήρου τὸ καλόηθες καὶ ἀόργητον. abuterque puerve paterne nihil mecum. animiæger dicatur ut Seneca in Epistolis dixit.'
+    print(pp.preprocess(text, False))
