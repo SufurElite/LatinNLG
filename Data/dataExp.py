@@ -30,7 +30,7 @@ class CorpusInterface:
         if author not in self.authorToWorks:
             self.authorToWorks[author] = []
         ppText = self.PrePro.preprocess(text, keepPunct = False)
-        self.authorToWorks[author].append([ppText,text])
+        self.authorToWorks[author].append([ppText,None])
         return True
 
     def similarity_identification(self, textOne, textTwo, simPercent = .7):
@@ -217,7 +217,7 @@ class CorpusInterface:
 
         # Once we've loaded in all the data available, determine if there are any identical texts for the authors
         # this is quite a slow methodology
-        
+        """
         authors = sorted(self.authorToWorks.keys())
         for author in authors:
             print("Currently on {}".format(author))
@@ -239,7 +239,8 @@ class CorpusInterface:
                     self.authorToWorks[author][i][1] = punctText
             for i in removeList:
                 del self.authorToWorks[author][i]   
-
+        """
+        
     def save_corpus(self):
         with open(OUR_CORPUS_LOC, "wb") as f:
             pickle.dump(self.authorToWorks, f, protocol=pickle.HIGHEST_PROTOCOL)

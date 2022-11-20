@@ -15,10 +15,10 @@ class PreProcessor():
         self.st = SentenceTokenizer()
     
 
-    def preprocess(self, inputText: str, keepPunct: bool = True) -> [str]:
+    def preprocess(self, inputText: str, keepPunct: bool = True) -> list[str]:
         text = []
         # include only unicode characters
-        inputText = unidecode(inputText)
+        inputText = unidecode(inputText).lower()
         sents = self.st.tokenize(inputText)
 
         for sent in sents:
