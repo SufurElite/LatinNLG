@@ -255,6 +255,7 @@ class CorpusInterface:
             text_retrieval()
         # check if we have already created the dataset previously
         if os.path.exists(OUR_CORPUS_LOC):
+            print("Found the existing corpus")
             self.load_existing_corpus()
         else: 
             self.load_new_data()
@@ -283,6 +284,40 @@ class CorpusInterface:
             with open("authors.txt", "w+") as f:
                 f.write(authors)
 
+    def get_authors_by_text_size(self, characterCount: bool = True):
+        def sort_tuple(tup):
+            #https://www.geeksforgeeks.org/python-program-to-sort-a-list-of-tuples-by-second-item/
+            # reverse = None (Sorts in Ascending order)
+            # key is set to sort using second element of
+            # sublist lambda has been used
+            return sorted(tup, key = lambda x: x[1], reverse=True)
+ 
+        values = []
+        for author in self.authorToWorks:
+            num = 0
+            if characterCount:
+                for j in range(len(self.authorToWorks[author])):
+                    num+=len(self.authorToWorks[author][j][0])
+            else:
+                num+=len(self.authorToWorks[author])
+            values.append((author,num))
+        values = sort_tuple(values)
+        return values
+
+    def lexical_diversity(self, authors):
+        """
+            This will measure the lexical diversity of a subset of the authors provided.
+        """
+        values = []
+        for author in authors:
+            totalText = []
+            initialLength = 0
+            for text in self.authorToWorks[author]:
+                totalText+=text[0]
+                initialLength+=len(text[0])
+            lexicalDiversity = len(totalText)/len(set(totalText))
+            values.append((author, lexicalDiversity))
+        return sorted(values, key = lambda x: x[1], reverse=True)
 
     def data_by_time_period(self):
         """ Return a distribution of the amount of text within given time periods """
