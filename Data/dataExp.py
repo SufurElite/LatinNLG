@@ -2,35 +2,40 @@
     A data exploration file
 """
 import os, json, re, pickle
-from texts.lat.text.lat_text_perseus.xml_to_json import cleanup_file_perseus_xml, extract_xml_str, parse_chapter, parse_poems
-from preprocess import PreProcessor
-from fetch import text_retrieval
+from .preprocess import PreProcessor
+from .fetch import text_retrieval
+from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
+import matplotlib.cm as mplcm
+import matplotlib.colors as colors
+
 # Directories for the data after fetch.py is run
-LATIN_BASE_DIR = os.getcwd()+"/texts/lat/text/"
-PERSEUS_DATA_DIR = LATIN_BASE_DIR+"lat_text_perseus/"
+LATIN_BASE_DIR = os.getcwd()+"/Data/texts/lat/text/"
 LATIN_LIBRARY_DIR = LATIN_BASE_DIR+"lat_text_latin_library/"
 ITALIAN_POETS_DIR = LATIN_BASE_DIR+"latin_text_poeti_ditalia/cltk_json/"
 LATIN_TESSERAE_DIR = LATIN_BASE_DIR+"lat_text_tesserae/texts/"
-LATIN_GRAMMATICORUM_DIR = LATIN_BASE_DIR+"latin_text_corpus_grammaticorum_latinorum/"
-
-OUR_CORPUS_LOC = os.getcwd()+"/corpus.pickle"
 
 class CorpusInterface:
-    def __init__(self):
-        # constants
-        self.FILE_TYPE_PARSERS = [parse_chapter, parse_poems]
+    def __init__(self, corpus_name="corpus.pickle", shouldTokenize:bool = True, particular_data: list = ["tesserae", "italian_poets", "latin_library"]):
+        self.OUR_CORPUS_LOC=os.getcwd()+"/Data/"+corpus_name
+        # for the LatinBERT text encoding, tokenization will happen within the model
+        self.shouldTokenize = shouldTokenize
         self.includeLineBreaks = False
         self.PrePro = PreProcessor()
         self.authorToWorks = {}
-        self.load_data()
-    
+        self.authorToColours = {}
+        self.load_data(particular_data)
+        
+        
+        
     def add_text(self, author: str, text: str) -> bool:
         """ Adds a particular text by a given author to the corpus, if the text does not already exist
         returns a boolean related to the success of adding the text"""
         if author not in self.authorToWorks:
             self.authorToWorks[author] = []
-        ppText = self.PrePro.preprocess(text, keepPunct = False)
-        self.authorToWorks[author].append([ppText,None])
+        
+        text = self.PrePro.preprocess(text, keepPunct = False, shouldTokenize = self.shouldTokenize)  
+        self.authorToWorks[author].append([text,None])
         return True
 
     def similarity_identification(self, textOne, textTwo, simPercent = .7):
@@ -59,43 +64,6 @@ class CorpusInterface:
                 else:
                     DP[i][j] = 0
         return (lcsLength/len(textOne))>simPercent
-
-    def load_perseus(self):
-        """ A modification of the xml_to_json main function"""
-        for root, dirs, files in os.walk(PERSEUS_DATA_DIR):
-            dirValues = root.split("/")
-            if dirValues[-1]!="opensource":continue
-            print(dirValues[-2].lower())
-            texts = []
-            for name in files:
-                if name.split(".")[-1]!="xml" or name.find("_lat")==-1: continue
-                fpath = root+"/"+name
-                text = ""
-
-                xml_str = cleanup_file_perseus_xml(fpath)
-                print(fpath)
-                tei = extract_xml_str(xml_str)
-                
-                for file_parser in self.FILE_TYPE_PARSERS:
-                    try:
-                        dict_object = file_parser(tei, fpath)
-                        print(dict_object)
-                        if str(dict_object) == "<class 'AssertionError'>":
-                            continue
-                        #if dict_object['text'] == {}:
-                        if dict_object.get('text') == {}:
-                            continue
-
-                        print("Parser '{}' worked! Moving to next file …".format(file_parser))
-                        text = dict_object.get('text')
-                        break
-
-                    except AttributeError as attrib_err:
-                        pass
-                print(name)
-                print(text)
-                input()
-        pass 
 
     def load_latin_library(self):
         for root, dirs, files in os.walk(LATIN_LIBRARY_DIR):
@@ -207,65 +175,54 @@ class CorpusInterface:
                 author = data['author'].lower().replace(" ",'')
                 self.add_text(author, text)  
 
-    def load_new_data(self):
-        self.load_tesserae_corpus()
-        self.load_italian_poets()
-        self.load_latin_library()
-        
-        #self.load_perseus()
-        #self.load_corpus_grammaticorum()
-
-        # Once we've loaded in all the data available, determine if there are any identical texts for the authors
-        # this is quite a slow methodology
-        """
-        authors = sorted(self.authorToWorks.keys())
-        for author in authors:
-            print("Currently on {}".format(author))
-            if len(self.authorToWorks[author])==1: continue
-            removeList = []
-            for i in range(len(self.authorToWorks[author])):
-                if i in removeList: continue
-                for j in range(i+1, len(self.authorToWorks[author])):
-                    print("{} | {}:{}".format(author,str(i),str(j)))
-                    if j in removeList: continue
-                    if self.similarity_identification(self.authorToWorks[author][i][0], self.authorToWorks[author][j][0]):
-                        print("Found identical texts for {}".format(author))
-                        if len(self.authorToWorks[author][i][0])<len(self.authorToWorks[author][j][0]):
-                            removeList.append(i)
-                        else:
-                            removeList.append(j)
-                if i not in removeList:
-                    punctText = self.PrePro.preprocess(self.authorToWorks[author][i][1], keepPunct = True)
-                    self.authorToWorks[author][i][1] = punctText
-            for i in removeList:
-                del self.authorToWorks[author][i]   
-        """
+    def load_new_data(self, particular_data: list = ["tesserae", "italian_poets", "latin_library"]):
+        if "tesserae" in particular_data:
+            print("Loading Tesserae")
+            self.load_tesserae_corpus()
+        if "italian_poets" in particular_data:
+            print("Loading Italian Poets")
+            self.load_italian_poets()
+        if "latin_library" in particular_data:
+            print("Loading Latin Library")
+            self.load_latin_library()
         
     def save_corpus(self):
-        with open(OUR_CORPUS_LOC, "wb") as f:
+        with open(self.OUR_CORPUS_LOC, "wb") as f:
             pickle.dump(self.authorToWorks, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     def load_existing_corpus(self):
-        with open(OUR_CORPUS_LOC, 'rb') as f:
+        with open(self.OUR_CORPUS_LOC, 'rb') as f:
             self.authorToWorks = pickle.load(f)
 
-    def load_data(self):
+    def load_data(self, particular_data: list = ["tesserae", "italian_poets", "latin_library"]):
         # first check if we have loaded the data using the fetch function
         if not os.path.exists(LATIN_BASE_DIR):
-            print("Did not find the downlaoded corpus. Did you run fetch.py? Now calling text_retrieval from fetch.py")
+            print("Did not find the downloaded corpus. Did you run fetch.py? Now calling text_retrieval from fetch.py")
             text_retrieval()
         # check if we have already created the dataset previously
-        if os.path.exists(OUR_CORPUS_LOC):
+        if os.path.exists(self.OUR_CORPUS_LOC):
             print("Found the existing corpus")
             self.load_existing_corpus()
         else: 
-            self.load_new_data()
+            self.load_new_data(particular_data)
             # save new data
             self.save_corpus()
 
         # now print information about the corpus
         self.corpus_overview()
+        self.associate_author_to_colour()
+    
+    def associate_author_to_colour(self):
+        # create a colour map
         
+        authors = list(self.authorToWorks.keys())
+        authors.sort()
+        cm = plt.get_cmap('gist_rainbow')
+        cNorm  = colors.Normalize(vmin=0, vmax=len(authors)-1)
+        scalarMap = mplcm.ScalarMappable(norm=cNorm, cmap=cm)
+        for i in range(len(authors)):
+            self.authorToColours[authors[i]] = scalarMap.to_rgba(i)
+
     def corpus_overview(self, saveText: bool = False):
         """ Just a helper function to show some information about the corpus """
         authorStats = ""
@@ -285,12 +242,15 @@ class CorpusInterface:
             with open("authors.txt", "w+") as f:
                 f.write(authors)
 
+    def get_authors(self):
+        return self.authorToWorks.keys()
+
+    def get_author_color(self, author):
+        return self.authorToColours[author]
+
     def get_authors_by_text_size(self, characterCount: bool = True):
         def sort_tuple(tup):
             #https://www.geeksforgeeks.org/python-program-to-sort-a-list-of-tuples-by-second-item/
-            # reverse = None (Sorts in Ascending order)
-            # key is set to sort using second element of
-            # sublist lambda has been used
             return sorted(tup, key = lambda x: x[1], reverse=True)
  
         values = []
@@ -304,6 +264,36 @@ class CorpusInterface:
             values.append((author,num))
         values = sort_tuple(values)
         return values
+
+    def get_text_for_author(self, author):
+        text = []
+        assert(author in self.authorToWorks)
+        for txt in self.authorToWorks[author]:
+            text+=txt[0]
+        return " ".join(text)
+
+    def get_data(self, n_authors: int = 50, keepPunct: bool = False, max_words: int = -1):
+        """ return the corpus's data that can be used by a model 
+            , max_docs: int = 4, max_words: int = 500
+        """
+        
+        texts = []
+        authors = []
+        
+        values = self.get_authors_by_text_size()
+
+        for i in range(n_authors):
+            author = values[i][0]
+            for j in range(len(self.authorToWorks[author])):
+                text = self.authorToWorks[author][j][0]
+                if max_words!=-1:
+                    text = text.split(" ")
+                    if len(text)>max_words:
+                        text = text[:200]
+                    text = " ".join(text)
+                texts.append(text)
+                authors.append(author)
+        return texts, authors
 
     def lexical_diversity(self, authors):
         """
@@ -323,7 +313,3 @@ class CorpusInterface:
     def data_by_time_period(self):
         """ Return a distribution of the amount of text within given time periods """
         pass
-
-
-if __name__=="__main__":
-    ci = CorpusInterface()

@@ -2,11 +2,17 @@
     A file to retrieve author specific data retrieval
 """
 
+# check if the directory exists yet
 import os
-os.environ["CLTK_DATA"] = os.getcwd()+"/texts/"
+if not os.path.exists(os.getcwd()+"/Data"):
+    os.mkdir(os.getcwd()+"/Data") 
+if not os.path.exists(os.getcwd()+"/Data/texts"):
+    os.mkdir(os.getcwd()+"/Data/texts") 
+os.environ["CLTK_DATA"] = os.getcwd()+"/Data/texts/"
 
 from cltk import NLP
 from cltk.data.fetch import FetchCorpus
+from cltk.embeddings.embeddings import Word2VecEmbeddings as W2VE
 
 
 def text_retrieval() -> None:
@@ -23,6 +29,6 @@ def text_retrieval() -> None:
     corpaDownloader.import_corpus("latin_text_corpus_grammaticorum_latinorum")
     print("Installing Language Models")
     corpaDownloader.import_corpus("lat_models_cltk")
-
-if __name__=="__main__":
-    text_retrieval()
+    print("Downloading Latin word2vec model")
+    w2v = W2VE(iso_code="lat")
+    
