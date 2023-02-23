@@ -269,8 +269,8 @@ class CorpusInterface:
         text = []
         assert(author in self.authorToWorks)
         for txt in self.authorToWorks[author]:
-            text+=txt[0]
-        return " ".join(text)
+            text.append(txt[0])
+        return text
 
     def get_data(self, n_authors: int = 50, keepPunct: bool = False, max_words: int = -1):
         """ return the corpus's data that can be used by a model 

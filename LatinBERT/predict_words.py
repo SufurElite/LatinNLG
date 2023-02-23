@@ -1,0 +1,87 @@
+import argparse
+import copy, re
+import sys
+from transformers import BertModel, BertForMaskedLM, BertPreTrainedModel
+from tensor2tensor.data_generators import text_encoder
+import torch
+import numpy as np
+from cltk.tokenizers.lat.lat import LatinWordTokenizer as WordTokenizer
+from .LatinTok import LatinTokenizer
+from torch import nn
+import random
+
+random.seed(1)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def proc(tokenids, wp_tokenizer, model):
+
+	mask_id=tokenids.index(wp_tokenizer.vocab["[MASK]"])
+	torch_tokenids=torch.LongTensor(tokenids).unsqueeze(0)
+	torch_tokenids=torch_tokenids.to(device)
+	
+	with torch.no_grad():
+		preds = model(torch_tokenids)
+		preds=preds[0]
+		sortedVals=torch.argsort(preds[0][mask_id], descending=True)
+		for k, p in enumerate(sortedVals[:1]):
+			predicted_index=p.item()
+			probs=nn.Softmax(dim=0)(preds[0][mask_id])
+			return wp_tokenizer.reverseVocab[predicted_index]
+
+def predict(wp_tokenizer, text_before_pred, model):
+
+	tokens=[]
+	tokens.extend(wp_tokenizer.tokenize(text_before_pred))
+	position=len(tokens) + 1
+	tokens.append("[MASK]")
+	#tokens.extend(wp_tokenizer.tokenize(text_after_lacuna))
+
+	tokens.insert(0,"[CLS]")
+	#tokens.append("[SEP]")
+
+	tokenids=wp_tokenizer.convert_tokens_to_ids(tokens)	
+
+	mask_id=tokenids.index(wp_tokenizer.vocab["[MASK]"])
+
+	torch_tokenids=torch.LongTensor(tokenids).unsqueeze(0)
+	torch_tokenids=torch_tokenids.to(device)
+	total_text = ""
+	with torch.no_grad():
+		preds = model(torch_tokenids)
+		preds=preds[0]
+		sortedVals=torch.argsort(preds[0][mask_id], descending=True)
+		p = sortedVals[0]
+		predicted_index=p.item()
+		probs=nn.Softmax(dim=0)(preds[0][mask_id])
+
+
+		suffix=""
+		if not wp_tokenizer.reverseVocab[predicted_index].endswith("_"):
+			uptokens=copy.deepcopy(tokenids)
+			uptokens.insert(position, predicted_index)
+			suffix=proc(uptokens, wp_tokenizer, model)
+		
+		predicted_word="%s%s" % (wp_tokenizer.reverseVocab[predicted_index], suffix)
+		predicted_word=re.sub("_$", "", predicted_word).lower()
+		total_text = text_before_pred + " " + predicted_word
+	
+	return total_text
+
+if __name__ == "__main__":
+
+	parser = argparse.ArgumentParser()
+	parser.add_argument('-b', '--bertPath', help='path to pre-trained BERT', required=True)
+	parser.add_argument('-t', '--tokenizerPath', help='path to Latin WordPiece tokenizer', required=True)
+	
+	args = vars(parser.parse_args())
+
+	bertPath=args["bertPath"]
+	tokenizerPath=args["tokenizerPath"]			
+	
+	encoder = text_encoder.SubwordTextEncoder(tokenizerPath)
+	wp_tokenizer = LatinTokenizer(encoder,lowercase=True)
+
+	model = BertForMaskedLM.from_pretrained(bertPath)
+	model.to(device)
+	predict(encoder,"arma virum canoque",model)

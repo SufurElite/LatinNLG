@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from torch import nn
 from transformers import BertModel, BertPreTrainedModel
+from .LatinTok import LatinTokenizer
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -223,59 +224,6 @@ class LatinBERT():
 		return bert_sents, author
 
 
-
-
-class LatinTokenizer():
-	def __init__(self, encoder):
-		self.vocab={}
-		self.reverseVocab={}
-		self.encoder=encoder
-
-		self.vocab["[PAD]"]=0
-		self.vocab["[UNK]"]=1
-		self.vocab["[CLS]"]=2
-		self.vocab["[SEP]"]=3
-		self.vocab["[MASK]"]=4
-
-		for key in self.encoder._subtoken_string_to_id:
-			self.vocab[key]=self.encoder._subtoken_string_to_id[key]+5
-			self.reverseVocab[self.encoder._subtoken_string_to_id[key]+5]=key
-
-
-	def convert_tokens_to_ids(self, tokens):
-		wp_tokens=[]
-		for token in tokens:
-			if token == "[PAD]":
-				wp_tokens.append(0)
-			elif token == "[UNK]":
-				wp_tokens.append(1)
-			elif token == "[CLS]":
-				wp_tokens.append(2)
-			elif token == "[SEP]":
-				wp_tokens.append(3)
-			elif token == "[MASK]":
-				wp_tokens.append(4)
-
-			else:
-				wp_tokens.append(self.vocab[token])
-
-		return wp_tokens
-
-	def tokenize(self, text):
-		tokens=text.split(" ")
-		wp_tokens=[]
-		for token in tokens:
-
-			if token in {"[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"}:
-				wp_tokens.append(token)
-			else:
-
-				wp_toks=self.encoder.encode(token)
-
-				for wp in wp_toks:
-					wp_tokens.append(self.reverseVocab[wp+5])
-
-		return wp_tokens
 
 def convert_to_toks(input_sents,sents_label,sent_tokenizer,word_tokenizer):
 
