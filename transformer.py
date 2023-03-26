@@ -8,6 +8,20 @@ import torch.nn as nn
 from torch.nn import functional as F
 from Data import dataExp
 import os 
+import re 
+
+import warnings
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore",category=UserWarning)
+#    from cltk.tokenizers.lat.lat import LatinWordTokenizer as WordTokenizer
+#    from cltk.tokenizers.lat.lat import LatinPunktSentenceTokenizer as SentenceTokenizer
+#from cltk.embeddings.embeddings import Word2VecEmbeddings as W2VE
+
+
+#w2v = W2VE("lat")
+#st = SentenceTokenizer()
+#wt = WordTokenizer()
+torch.cuda.empty_cache()
 
 # hyperparameters
 batch_size = 64 
@@ -17,33 +31,38 @@ eval_interval = 500
 learning_rate = 3e-4
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 eval_iters = 200
+#n_embd = 512
 n_embd = 384
 # every head is 64 dim, 384/6 = 64
+#n_head = 8
 n_head = 6
 n_layer = 6
 dropout = .2
 # ------------
 
-torch.manual_seed(1337)
+torch.manual_seed(42)
 
 # load in the data
-CI = dataExp.CorpusInterface(corpus_name="text_corpus.pickle", shouldTokenize = False)
+#CI = dataExp.CorpusInterface(corpus_name="text_corpus.pickle", shouldTokenize = False)
+CI = dataExp.CorpusInterface(corpus_name="tokenized_corpus.pickle", shouldTokenize = True)
 text = CI.get_total_data().replace("\t","")
 
 chars = sorted(list(set(text)))
 vocab_size = len(chars)
+print(f"The character vocabulary is : {chars}")
 
 # We just create a mapping between our character vocabulary
 # and their corresponding integer value, and define lambda funcs to do this mapping for us
+
 stoi = {ch:i for i, ch in enumerate(chars)}
-itos = { i:ch for i,ch in enumerate(chars)}
+itos = {i:ch for i, ch in enumerate(chars)}
 encode = lambda s: [stoi[c] for c in s] 
 decode = lambda l: ''.join([itos[i] for i in l])
 
 data = torch.tensor(encode(text), dtype=torch.long)
 
 # Let's create a train/val split
-n = int(.9*len(data)) 
+n = int(.8*len(data)) 
 train_data = data[:n]
 val_data = data[n:]
 
@@ -164,14 +183,15 @@ class LanguageModel(nn.Module):
         self.position_embedding_table = nn.Embedding(context_size, n_embd)
         self.blocks = nn.Sequential(*[Block(n_embd, n_head) for _ in range(n_layer)])
         self.ln_final = nn.LayerNorm(n_embd)
-        self.lm_head = nn.Linear(n_embd, vocab_size)
+        self.lm_head = nn.Linear(n_embd, 100)
         
     def forward(self, idx, targets=None):
         batch, time = idx.shape
-
+        
         # idx and targets are both (batch, time) tensor of integers
         tok_emb = self.token_embedding_table(idx) # (batch, time, channel)
         pos_emb = self.position_embedding_table(torch.arange(time, device=device)) # (time, channel)
+        
         x = tok_emb + pos_emb # (batch,time, channel)
         x = self.blocks(x) # (batch,time, channel)
         x = self.ln_final(x) # (batch,time, channel)
@@ -204,30 +224,42 @@ class LanguageModel(nn.Module):
             idx = torch.cat((idx, idx_next), dim=1) # (batch, time step+1)
         return idx
 
-model = LanguageModel()
-m = model.to(device)
+if __name__=="__main__":
+    model = LanguageModel()
+    m = model.to(device)
+    model.load_state_dict(torch.load('LatinTransformer/model_3.pt'))
+    
+    # create a PyTorch optimizer
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
-# create a PyTorch optimizer
-optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    for iter in range(max_iters):
 
-for iter in range(max_iters):
+        # every once in a while evaluate the loss on train and val sets
+        if iter % eval_interval == 0 or iter == max_iters - 1:
+            losses = estimate_loss()
+            print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
 
-    # every once in a while evaluate the loss on train and val sets
-    if iter % eval_interval == 0 or iter == max_iters - 1:
-        losses = estimate_loss()
-        print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+        # sample a batch of data
+        xb, yb = get_batch('train')
 
-    # sample a batch of data
-    xb, yb = get_batch('train')
+        # evaluate the loss
+        logits, loss = model(xb, yb)
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
 
-    # evaluate the loss
-    logits, loss = model(xb, yb)
-    optimizer.zero_grad(set_to_none=True)
-    loss.backward()
-    optimizer.step()
-
-# generate from the model
-context = torch.zeros((1, 1), dtype=torch.long, device=device)
-print(decode(m.generate(context, max_new_tokens=500)[0].tolist()))
-open('Results/lat_transformer_pred.txt', 'w+').write(decode(m.generate(context, max_new_tokens=10000)[0].tolist()))
-torch.save(model.state_dict(), os.getcwd()+"/LatinTransformer/")
+    
+    
+    
+    context = torch.zeros((1, 1), dtype=torch.long, device=device)
+    print(decode(m.generate(context, max_new_tokens=500)[0].tolist()))
+    # generate context for the model
+    context_values = encode("Pedicabo ego vos et irrumabo, Aureli pathice et cinaede Furi, qui me ex versiculis meis putastis ".lower())
+    context = torch.tensor(context_values, dtype=torch.long, device=device).reshape((len(context_values),1))
+    
+    torch.save(model.state_dict(), os.getcwd()+"/LatinTransformer/model_4.pt")
+    generated = m.generate(context, max_new_tokens=500)[0].tolist()
+    full_text = context_values + generated
+    full_text_decoded = decode(full_text)
+    open('Results/lat_transformer_pred_4.txt', 'w+').write(full_text_decoded)
+    

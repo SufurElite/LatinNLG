@@ -28,7 +28,47 @@ def proc(tokenids, wp_tokenizer, model):
 			predicted_index=p.item()
 			probs=nn.Softmax(dim=0)(preds[0][mask_id])
 			return wp_tokenizer.reverseVocab[predicted_index]
+def infilling(wp_tokenizer, text_before_pred, text_after_lacuna, model):
 
+	
+	tokens=[]
+	tokens.extend(wp_tokenizer.tokenize(text_before_pred))
+	position=len(tokens) + 1
+	tokens.append("[MASK]")
+	tokens.extend(wp_tokenizer.tokenize(text_after_lacuna))
+
+	tokens.insert(0,"[CLS]")
+	tokens.append("[SEP]")
+
+	tokenids=wp_tokenizer.convert_tokens_to_ids(tokens)	
+
+	mask_id=tokenids.index(wp_tokenizer.vocab["[MASK]"])
+
+	torch_tokenids=torch.LongTensor(tokenids).unsqueeze(0)
+	torch_tokenids=torch_tokenids.to(device)
+	total_text = ""
+	with torch.no_grad():
+		preds = model(torch_tokenids)
+		preds = preds[0]
+		
+		sortedVals=torch.argsort(preds[0][mask_id], descending=True)
+		p = sortedVals[0]
+		predicted_index=p.item()
+		probs=nn.Softmax(dim=0)(preds[0][mask_id])
+
+
+		suffix=""
+		if not wp_tokenizer.reverseVocab[predicted_index].endswith("_"):
+			uptokens=copy.deepcopy(tokenids)
+			uptokens.insert(position, predicted_index)
+			suffix=proc(uptokens, wp_tokenizer, model)
+		
+		predicted_word="%s%s" % (wp_tokenizer.reverseVocab[predicted_index], suffix)
+		predicted_word=re.sub("_$", "", predicted_word).lower()
+		total_text = text_before_pred + " " + predicted_word + " " + text_after_lacuna
+	
+	return total_text
+		
 def predict(wp_tokenizer, text_before_pred, model):
 
 	tokens=[]
@@ -37,7 +77,7 @@ def predict(wp_tokenizer, text_before_pred, model):
 	tokens.append("[MASK]")
 	#tokens.extend(wp_tokenizer.tokenize(text_after_lacuna))
 
-	tokens.insert(0,"[CLS]")
+	#tokens.insert(0,"[CLS]")
 	#tokens.append("[SEP]")
 
 	tokenids=wp_tokenizer.convert_tokens_to_ids(tokens)	
@@ -49,9 +89,10 @@ def predict(wp_tokenizer, text_before_pred, model):
 	total_text = ""
 	with torch.no_grad():
 		preds = model(torch_tokenids)
-		preds=preds[0]
-		sortedVals=torch.argsort(preds[0][mask_id], descending=True)
-		p = sortedVals[0]
+		kth_vals, kth_idx = preds.topk(40, dim=-1)
+		dist = torch.distributions.categorical.Categorical(logits=kth_vals)
+		idx = kth_idx.gather(dim=1, index=dist.sample().unsqueeze(-1)).squeeze(-1)
+	
 		predicted_index=p.item()
 		probs=nn.Softmax(dim=0)(preds[0][mask_id])
 
