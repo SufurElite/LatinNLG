@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 import matplotlib.pyplot as plt
 import matplotlib.cm as mplcm
 import matplotlib.colors as colors
+import random
 
 # Directories for the data after fetch.py is run
 LATIN_BASE_DIR = os.getcwd()+"/Data/texts/lat/text/"
@@ -16,10 +17,12 @@ ITALIAN_POETS_DIR = LATIN_BASE_DIR+"latin_text_poeti_ditalia/cltk_json/"
 LATIN_TESSERAE_DIR = LATIN_BASE_DIR+"lat_text_tesserae/texts/"
 
 class CorpusInterface:
-    def __init__(self, corpus_name="corpus.pickle", shouldTokenize:bool = True, particular_data: list = ["tesserae", "italian_poets", "latin_library"]):
+    def __init__(self, corpus_name="corpus.pickle", keepPunc:bool = False, shouldTokenize:bool = True, shouldLemma:bool = False, particular_data: list = ["tesserae", "italian_poets", "latin_library"]):
         self.OUR_CORPUS_LOC=os.getcwd()+"/Data/"+corpus_name
         # for the LatinBERT text encoding, tokenization will happen within the model
         self.shouldTokenize = shouldTokenize
+        self.shouldLemma = shouldLemma
+        self.keepPunct = keepPunc
         self.includeLineBreaks = False
         self.PrePro = PreProcessor()
         self.authorToWorks = {}
@@ -34,7 +37,7 @@ class CorpusInterface:
         if author not in self.authorToWorks:
             self.authorToWorks[author] = []
         
-        text = self.PrePro.preprocess(text, keepPunct = False, shouldTokenize = self.shouldTokenize)  
+        text = self.PrePro.preprocess(text, keepPunct = self.keepPunct, shouldTokenize = self.shouldTokenize)  
         self.authorToWorks[author].append([text,None])
         return True
 
@@ -69,8 +72,8 @@ class CorpusInterface:
         for root, dirs, files in os.walk(LATIN_LIBRARY_DIR):
             print(root)
             author = root.split("/")[-1].strip()
-            if author == "git": continue
-
+            if author == "git" or author==".ipynb_checkpoints": continue
+            
             print("author : {}".format(author))
             for name in files:
                 fileName = name.split(".")
@@ -126,7 +129,7 @@ class CorpusInterface:
                 
                 author = data['author'].lower().replace(" ",'')
                 # RIGHT NOW JUST A SKIP TO NOT WORRY ABOUT DUPLICATES UNTIL I USE THE OTHER METHODOLOGY
-                if author in self.authorToWorks: continue
+                # if author in self.authorToWorks: continue
                 
                 text = []
                 for i in data['text'].keys():
@@ -195,18 +198,20 @@ class CorpusInterface:
             self.authorToWorks = pickle.load(f)
 
     def load_data(self, particular_data: list = ["tesserae", "italian_poets", "latin_library"]):
-        # first check if we have loaded the data using the fetch function
-        if not os.path.exists(LATIN_BASE_DIR):
-            print("Did not find the downloaded corpus. Did you run fetch.py? Now calling text_retrieval from fetch.py")
-            text_retrieval()
-        # check if we have already created the dataset previously
+        # First check if we have already created the dataset previously
         if os.path.exists(self.OUR_CORPUS_LOC):
             print("Found the existing corpus")
             self.load_existing_corpus()
+        elif not os.path.exists(LATIN_BASE_DIR):
+            # check if we have loaded the data using the fetch function
+            print("Did not find the downloaded corpus. Did you run fetch.py? Now calling text_retrieval from fetch.py")
+            text_retrieval()
         else: 
             self.load_new_data(particular_data)
             # save new data
             self.save_corpus()
+        
+        
 
         # now print information about the corpus
         self.corpus_overview()
@@ -214,7 +219,6 @@ class CorpusInterface:
     
     def associate_author_to_colour(self):
         # create a colour map
-        
         authors = list(self.authorToWorks.keys())
         authors.sort()
         cm = plt.get_cmap('gist_rainbow')
@@ -265,12 +269,21 @@ class CorpusInterface:
         values = sort_tuple(values)
         return values
 
-    def get_text_for_author(self, author):
+    def get_text_for_author(self, author:str, shouldShuffle:bool = False, returnAsList:bool = False):
         text = []
+        author = author.lower()
         assert(author in self.authorToWorks)
+        
         for txt in self.authorToWorks[author]:
-            text.append(txt[0])
-        return text
+            if not self.shouldTokenize:
+                text.append(txt[0])
+            else:
+                text.append(" ".join(txt[0]))
+        if shouldShuffle:
+            random.shuffle(text)
+        if returnAsList:
+            return text
+        return " ".join(text)
 
     def get_data(self, n_authors: int = 50, keepPunct: bool = False, max_words: int = -1):
         """ return the corpus's data that can be used by a model 
@@ -294,7 +307,18 @@ class CorpusInterface:
                 texts.append(text)
                 authors.append(author)
         return texts, authors
-
+    
+    def get_total_data(self):
+        texts = []
+        for author in self.authorToWorks.keys():
+            for text in self.authorToWorks[author]:
+                if not self.shouldTokenize:
+                    texts.append(text[0])
+                else:
+                    texts.append(" ".join(text[0]))
+        random.shuffle(texts)
+        return " ".join(texts)
+    
     def lexical_diversity(self, authors):
         """
             This will measure the lexical diversity of a subset of the authors provided.

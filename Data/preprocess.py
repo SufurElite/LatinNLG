@@ -1,5 +1,5 @@
 import os, warnings
-os.environ["CLTK_DATA"] = os.getcwd()+"/Data/texts/"
+os.environ["CLTK_DATA"] = os.getcwd()+"/texts/"
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore",category=UserWarning)
     from cltk.tokenizers.lat.lat import LatinWordTokenizer as WordTokenizer
@@ -34,11 +34,10 @@ class PreProcessor():
                     text+=lemmToks
                 else:
                     text+=wordToks
-            return text
-        return inputText 
+        return text 
 
 if __name__=="__main__":
     pp = PreProcessor()
     text = 'atque haec Παρὰ τοῦ πάππου Οὐήρου τὸ καλόηθες καὶ ἀόργητον. abuterque puerve paterne nihil mecum. animiæger dicatur ut Seneca in Epistolis dixit.'
-    text = "nautas viam puer"
-    print(pp.preprocess(text, False))
+    text = "nautas viam puer. Vidit viam."
+    print(pp.preprocess(text, True, True, False))
