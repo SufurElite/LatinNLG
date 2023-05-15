@@ -1,3 +1,8 @@
+"""
+	This is a modified version of the predict_words code found in the latin-bert github: https://github.com/dbamman/latin-bert/blob/master/case_studies/infilling/scripts/predict_word.py .
+
+"""
+
 import argparse
 import copy, re
 import sys
@@ -28,9 +33,12 @@ def proc(tokenids, wp_tokenizer, model):
 			predicted_index=p.item()
 			probs=nn.Softmax(dim=0)(preds[0][mask_id])
 			return wp_tokenizer.reverseVocab[predicted_index]
+		
 def infilling(wp_tokenizer, text_before_pred, text_after_lacuna, model):
-
-	
+	"""
+		This takes in a tokenizer, the text before the masked text, the text after it, and the 
+		model to perform infilling.
+	"""
 	tokens=[]
 	tokens.extend(wp_tokenizer.tokenize(text_before_pred))
 	position=len(tokens) + 1
@@ -71,18 +79,20 @@ def infilling(wp_tokenizer, text_before_pred, text_after_lacuna, model):
 
 		
 def	predict(wp_tokenizer, text_before_pred,	model,	context_size:int=256,	k:int	=	20,	sampleK:bool	=	False):
-
+	"""
+		The predict function follows the same methodology as infilling, except the there is only text before the 
+		prediction and then, if sampling is allowed, it samples from the top k predicted words.
+	"""
 	tokens=[]
 	tokens.extend(wp_tokenizer.tokenize(text_before_pred))
 	position=len(tokens)	+	1
 	tokens.append("[MASK]")
 	pads = context_size-len(tokens)-2
 	tokens+=["[PAD]"]*pads
-	#tokens.extend(wp_tokenizer.tokenize(text_after_lacuna))
-
+	
 	tokens.insert(0,"[CLS]")
 	tokens.append("[SEP]")
-	#print(tokens)
+	
 
 	tokenids=wp_tokenizer.convert_tokens_to_ids(tokens)	
 

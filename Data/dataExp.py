@@ -1,5 +1,6 @@
 """
-    A data exploration file
+    A data exploration file. It used to define the Corpus Interface that every aspect of 
+    the research project uses.
 """
 import os, json, re, pickle
 from .preprocess import PreProcessor
@@ -49,6 +50,8 @@ class CorpusInterface:
              - a similarity percentage - the percentage of text that must overlap to be identified as the same
         This function finds the the Longest Common Subphrase between the two preprocessed texts, using dynamic programming,
         that then can be used to determine if two texts are sufficiently identical to not include them again 
+
+        TODO: Replace this process with the Levenshtein Distance to determine similarity
         """
     
         DP = [[0 for k in range(len(textTwo)+1)] for l in range(len(textOne)+1)]
@@ -69,6 +72,9 @@ class CorpusInterface:
         return (lcsLength/len(textOne))>simPercent
 
     def load_latin_library(self):
+        """
+            Load in all the Latin Library texts to the author to text dictionary
+        """
         for root, dirs, files in os.walk(LATIN_LIBRARY_DIR):
             print(root)
             author = root.split("/")[-1].strip()
@@ -120,6 +126,9 @@ class CorpusInterface:
         pass
     
     def load_italian_poets(self):
+        """
+            Load in the Italian poetry.
+        """
         for root, dirs, files in os.walk(ITALIAN_POETS_DIR):
             for name in files:
                 if name.split(".")[-1]!="json": continue
@@ -129,7 +138,7 @@ class CorpusInterface:
                 
                 author = data['author'].lower().replace(" ",'')
                 # RIGHT NOW JUST A SKIP TO NOT WORRY ABOUT DUPLICATES UNTIL I USE THE OTHER METHODOLOGY
-                # if author in self.authorToWorks: continue
+                if author in self.authorToWorks: continue
                 
                 text = []
                 for i in data['text'].keys():
@@ -140,6 +149,9 @@ class CorpusInterface:
 
 
     def load_tesserae_corpus(self):
+        """
+            Load in the text from Latin Tesserae 
+        """
         for root, dirs, files in os.walk(LATIN_TESSERAE_DIR):
             dirValues = root.split("/")
             if dirValues[-1]=="metadata": continue
@@ -165,6 +177,9 @@ class CorpusInterface:
                 self.add_text(author, text)  
     
     def load_corpus_grammaticorum(self):
+        """
+            Load in the text from Latin Tesserae
+        """
         for root, dirs, files in os.walk(LATIN_GRAMMATICORUM_DIR):
             for name in files:
                 if name.split(".")[-1]!="json": continue
@@ -179,21 +194,31 @@ class CorpusInterface:
                 self.add_text(author, text)  
 
     def load_new_data(self, particular_data: list = ["tesserae", "italian_poets", "latin_library"]):
+        """
+            Goes through all the corpora to add to the class
+        """
+        if "latin_library" in particular_data:
+            print("Loading Latin Library")
+            self.load_latin_library()
         if "tesserae" in particular_data:
             print("Loading Tesserae")
             self.load_tesserae_corpus()
         if "italian_poets" in particular_data:
             print("Loading Italian Poets")
             self.load_italian_poets()
-        if "latin_library" in particular_data:
-            print("Loading Latin Library")
-            self.load_latin_library()
         
     def save_corpus(self):
+        """
+            Save the author to their works dictionary, so it doesn't have 
+            to load in the text every time
+        """
         with open(self.OUR_CORPUS_LOC, "wb") as f:
             pickle.dump(self.authorToWorks, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     def load_existing_corpus(self):
+        """
+            Load in the existing dictionary provided
+        """
         with open(self.OUR_CORPUS_LOC, 'rb') as f:
             self.authorToWorks = pickle.load(f)
 
@@ -211,13 +236,14 @@ class CorpusInterface:
             # save new data
             self.save_corpus()
         
-        
-
         # now print information about the corpus
         self.corpus_overview()
         self.associate_author_to_colour()
     
     def associate_author_to_colour(self):
+        """
+            Every author should have a unique colour associated with it
+        """
         # create a colour map
         authors = list(self.authorToWorks.keys())
         authors.sort()
@@ -254,7 +280,6 @@ class CorpusInterface:
 
     def get_authors_by_text_size(self, characterCount: bool = True):
         def sort_tuple(tup):
-            #https://www.geeksforgeeks.org/python-program-to-sort-a-list-of-tuples-by-second-item/
             return sorted(tup, key = lambda x: x[1], reverse=True)
  
         values = []
@@ -270,6 +295,9 @@ class CorpusInterface:
         return values
 
     def get_text_for_author(self, author:str, shouldShuffle:bool = False, returnAsList:bool = False):
+        """
+            Retrieve particular author-styled subset
+        """
         text = []
         author = author.lower()
         assert(author in self.authorToWorks)
@@ -286,8 +314,9 @@ class CorpusInterface:
         return " ".join(text)
 
     def get_data(self, n_authors: int = 50, keepPunct: bool = False, max_words: int = -1):
-        """ return the corpus's data that can be used by a model 
-            , max_docs: int = 4, max_words: int = 500
+        """ 
+            return the corpus's data that can be used by a model 
+            for Latin Authorship
         """
         
         texts = []
@@ -309,6 +338,10 @@ class CorpusInterface:
         return texts, authors
     
     def get_total_data(self):
+        """
+            Get the entirety of the dataset, used to
+            pre-train a Latin transformer
+        """
         texts = []
         for author in self.authorToWorks.keys():
             for text in self.authorToWorks[author]:
@@ -333,7 +366,3 @@ class CorpusInterface:
             lexicalDiversity = len(totalText)/len(set(totalText))
             values.append((author, lexicalDiversity))
         return sorted(values, key = lambda x: x[1], reverse=True)
-
-    def data_by_time_period(self):
-        """ Return a distribution of the amount of text within given time periods """
-        pass

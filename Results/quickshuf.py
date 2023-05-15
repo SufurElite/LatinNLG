@@ -1,3 +1,7 @@
+"""
+    This file is to create the random shuffle of generated model texts, which are then converted 
+    into the survey
+"""
 import random
 
 texts = ["olim sapiens vir nomine rufo erat. hic cum equitibus colloqui venit. idem cum suis agit liberius et magna parte militum disceditur. tum vero etiam reliquis civitatibus terror et a quibusdam dissentire videbatur. tum vero ex omnibus civitatibus principes convenerunt",

@@ -1,3 +1,12 @@
+"""
+	This file is effectively the same as the LatinBERT one, the imports are different 
+	and some modifications had been tried.  The purpose of it is mostly to have the Class architecture for
+	LatinBERT.
+
+	There was also an error in the LatinBERT file due to deprecation. If you see the 'todo' at the bottom, 
+	I realised that the transformers library had an update that was required for this file to work.
+
+"""
 import argparse, sys
 from cltk.tokenizers.lat.lat import LatinWordTokenizer as WordTokenizer
 from cltk.tokenizers.lat.lat import LatinPunktSentenceTokenizer as SentenceTokenizer

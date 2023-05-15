@@ -1,7 +1,14 @@
 """
  Simple Implementation of Attention is all you need, 
- followed along/created with Karpathy's video working through it
- applied to my Latin Corpus
+ followed along/created with Karpathy's video: https://www.youtube.com/watch?v=kCc8FmEb1nY, where he walks through 
+ the pivotal paper Attention is All You Need.
+ 
+ This file trains the transformer architecture on select author subsets, determined
+ by the list of authors.
+
+ The class definitions are written within the for loop because the encoding size is dependent on the size of the vocabulary/the 
+ characters available within the dataset that is slightly unique to each author. This should be standardised across all the authors
+ in the future.
 """
 import torch
 import torch.nn as nn
@@ -22,18 +29,16 @@ eval_interval = 500
 learning_rate = 3e-4
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 eval_iters = 200
-#n_embd = 512
 n_embd = 384
-# every head is 64 dim, 384/6 = 64
-#n_head = 8
 n_head = 6
 n_layer = 6
 dropout = .2
-# ------------
+
 
 torch.manual_seed(42)
-# load in the data
+# load in the data from the Corpus Interface
 CI = dataExp.CorpusInterface(corpus_name="text_corpus.pickle", shouldTokenize = False)
+
 for author in authors:
     text = CI.get_text_for_author(author=author,shouldShuffle=True).replace("\t","")
 
@@ -99,7 +104,7 @@ for author in authors:
             k = self.key(x) # (batch, time, head_size)
             q = self.query(x) # (batch, time, head_size)
 
-            # compute the affinities/scaled attention scores
+            # compute the scaled attention scores
             weights = q @ k.transpose(-2, -1) * channel **-.5
             # don't want to interact with subsequent time step tokens
             # i.e. makes it a decoder block

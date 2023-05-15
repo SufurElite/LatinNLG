@@ -1,5 +1,5 @@
 """
-    A file to retrieve author specific data retrieval
+    A file to retrieve all the necessary data files
 """
 
 # check if the directory exists yet
